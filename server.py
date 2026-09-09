@@ -33,11 +33,7 @@ from board_encoding import to_matrix, move_to_index, index_to_move, BOARD_CHANNE
 
 app = FastAPI(title="ChessNet Backend")
 
-<<<<<<< Updated upstream
-# CORS
-=======
 # CORS — must be added BEFORE any routes for preflight to work
->>>>>>> Stashed changes
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -59,6 +55,11 @@ sessions = {}          # session_id -> { last_seen, created, games_played, total
 ACTIVE_TIMEOUT = 30    # seconds before a session is considered inactive
 total_games_trained = 0
 total_moves_played = 0
+
+
+@app.get("/")
+async def health():
+    return {"status": "ok"}
 
 
 class MoveRequest(BaseModel):

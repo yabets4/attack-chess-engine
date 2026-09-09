@@ -39,11 +39,20 @@ app.add_middleware(
     allow_origins=[
         "https://attack-chess-ui.vercel.app",
         "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
     ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Health checks for Render deployment monitoring
+@app.get("/")
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 # Global model state
 model = None
@@ -534,9 +543,12 @@ async def train(req: TrainRequest):
 if __name__ == "__main__":
     import uvicorn
 
+    default_port = int(os.environ.get("PORT", 8001))
+    default_host = os.environ.get("HOST", "0.0.0.0")
+
     parser = argparse.ArgumentParser(description="ChessNet Backend Server")
-    parser.add_argument("--port", type=int, default=8001, help="Port to run on")
-    parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to")
+    parser.add_argument("--port", type=int, default=default_port, help="Port to run on")
+    parser.add_argument("--host", type=str, default=default_host, help="Host to bind to")
     parser.add_argument("--model", type=str, default=None, help="Path to model checkpoint")
     parser.add_argument("--checkpoints-dir", type=str, default=None, help="Path to checkpoints directory")
 

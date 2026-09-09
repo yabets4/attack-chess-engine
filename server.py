@@ -33,14 +33,16 @@ from board_encoding import to_matrix, move_to_index, index_to_move, BOARD_CHANNE
 
 app = FastAPI(title="ChessNet Backend")
 
-# CORS — allow all origins for public API
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=[
+        "https://attack-chess-ui.vercel.app",
+        "http://localhost:5173",
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
 )
 
 # Global model state

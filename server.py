@@ -12,6 +12,7 @@ import argparse
 import glob
 import time
 import uuid
+import gc
 from pathlib import Path
 
 import torch
@@ -98,20 +99,18 @@ def get_legal_move_indices(board: chess.Board) -> list:
 
 
 def load_model(checkpoint_name: str = "latest"):
-    """Load a model checkpoint."""
+    """Load a model checkpoint (memory-optimised for small instances)."""
     global model, device
 
     if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = torch.device("cpu")
 
     # Find checkpoint path
     if checkpoint_name == "latest":
-        # Try model_best.pt first, then latest ep file
         best_path = os.path.join(checkpoints_dir, "model_best.pt")
         if os.path.exists(best_path):
             ckpt_path = best_path
         else:
-            # Find latest epoch file
             ep_files = sorted(glob.glob(os.path.join(checkpoints_dir, "model_ep*.pt")))
             if ep_files:
                 ckpt_path = ep_files[-1]
@@ -122,13 +121,17 @@ def load_model(checkpoint_name: str = "latest"):
         if not os.path.exists(ckpt_path):
             raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
 
-    # Create model and load weights
+    # Create model with float32 (not float64) and no dropout for inference
     net = ChessNet(num_res=17, filters=256, se_ratio=4, p_drop=0.0)
-    state_dict = torch.load(ckpt_path, map_location=device, weights_only=True)
+    state_dict = torch.load(ckpt_path, map_location="cpu", weights_only=True)
     net.load_state_dict(state_dict)
-    net.to(device)
-    net.eval()
 
+    # Free memory: delete optimizer state if present, strip gradients
+    for p in net.parameters():
+        p.requires_grad = False
+
+    net.eval()
+    gc.collect()
     return net
 
 
@@ -277,19 +280,11 @@ async def admin_stats():
 
 @app.on_event("startup")
 async def startup_event():
-    """Load the default model on startup."""
-    global model, checkpoints_dir
-
-    # Default checkpoints directory (same dir as server.py)
+    """Print startup info — model loads lazily on first request."""
+    global checkpoints_dir
     checkpoints_dir = str(Path(__file__).resolve().parent)
     print(f"Checkpoints directory: {checkpoints_dir}")
-
-    try:
-        model = load_model("latest")
-        print(f"Model loaded successfully on {device}")
-    except Exception as e:
-        print(f"Warning: Could not load default model: {e}")
-        print("Will try to load on first request.")
+    print("Model will load lazily on first request to save memory.")
 
 
 @app.get("/api/checkpoints")

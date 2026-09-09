@@ -24,7 +24,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 # Add src directory to path for model imports
-src_dir = str(Path(__file__).resolve().parent.parent.parent.parent / "src")
+src_dir = str(Path(__file__).resolve().parent / "src")
 sys.path.insert(0, src_dir)
 
 from model import ChessNet
@@ -280,8 +280,8 @@ async def startup_event():
     """Load the default model on startup."""
     global model, checkpoints_dir
 
-    # Default checkpoints directory
-    checkpoints_dir = str(Path(__file__).resolve().parent.parent)
+    # Default checkpoints directory (same dir as server.py)
+    checkpoints_dir = str(Path(__file__).resolve().parent)
     print(f"Checkpoints directory: {checkpoints_dir}")
 
     try:
@@ -298,7 +298,7 @@ async def get_checkpoints():
     global checkpoints_dir
 
     if checkpoints_dir is None:
-        checkpoints_dir = str(Path(__file__).resolve().parent.parent)
+        checkpoints_dir = str(Path(__file__).resolve().parent)
 
     checkpoints = ["latest"]
     for f in sorted(glob.glob(os.path.join(checkpoints_dir, "model_*.pt"))):

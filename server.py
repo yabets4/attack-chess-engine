@@ -33,7 +33,11 @@ from board_encoding import to_matrix, move_to_index, index_to_move, BOARD_CHANNE
 
 app = FastAPI(title="ChessNet Backend")
 
+<<<<<<< Updated upstream
 # CORS
+=======
+# CORS — must be added BEFORE any routes for preflight to work
+>>>>>>> Stashed changes
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

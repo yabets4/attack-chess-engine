@@ -135,30 +135,53 @@ def load_model(checkpoint_name: str = "latest"):
 
     if device is None:
         device = torch.device("cpu")
+        try:
+            torch.set_num_threads(1)
+            torch.set_grad_enabled(False)
+        except Exception:
+            pass
+
+    ckpt_dir = resolve_checkpoints_dir()
 
     # Find checkpoint path
     if checkpoint_name == "latest":
-        best_path = os.path.join(checkpoints_dir, "model_best.pt")
+        best_path = os.path.join(ckpt_dir, "model_best.pt")
         if os.path.exists(best_path):
             ckpt_path = best_path
         else:
-            ep_files = sorted(glob.glob(os.path.join(checkpoints_dir, "model_ep*.pt")))
+            ep_files = sorted(glob.glob(os.path.join(ckpt_dir, "model_ep*.pt")))
             if ep_files:
                 ckpt_path = ep_files[-1]
             else:
-                raise FileNotFoundError(f"No checkpoints found in {checkpoints_dir}")
+                raise FileNotFoundError(f"No checkpoints found in {ckpt_dir}")
     else:
-        ckpt_path = os.path.join(checkpoints_dir, checkpoint_name)
+        ckpt_path = os.path.join(ckpt_dir, checkpoint_name)
         if not os.path.exists(ckpt_path):
             raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
 
+    gc.collect()
+
     # Create model with float32 (not float64) and no dropout for inference
     net = ChessNet(num_res=17, filters=256, se_ratio=4, p_drop=0.0)
-    try:
-        state_dict = torch.load(ckpt_path, map_location="cpu", weights_only=True)
-    except Exception:
-        state_dict = torch.load(ckpt_path, map_location="cpu")
+    state_dict = None
+    for kwargs in [
+        {"map_location": "cpu", "mmap": True, "weights_only": True},
+        {"map_location": "cpu", "mmap": True},
+        {"map_location": "cpu", "weights_only": True},
+        {"map_location": "cpu"},
+    ]:
+        try:
+            state_dict = torch.load(ckpt_path, **kwargs)
+            break
+        except Exception:
+            continue
+
+    if state_dict is None:
+        raise RuntimeError(f"Failed to load checkpoint from {ckpt_path}")
+
     net.load_state_dict(state_dict)
+    del state_dict
+    gc.collect()
 
     # Free memory: delete optimizer state if present, strip gradients
     for p in net.parameters():

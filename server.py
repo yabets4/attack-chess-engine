@@ -54,6 +54,20 @@ app.add_middleware(
 async def health():
     return {"status": "ok"}
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    origin = request.headers.get("origin") or "*"
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)},
+        headers={
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        },
+    )
+
 # Global model state
 model = None
 device = None
@@ -140,7 +154,10 @@ def load_model(checkpoint_name: str = "latest"):
 
     # Create model with float32 (not float64) and no dropout for inference
     net = ChessNet(num_res=17, filters=256, se_ratio=4, p_drop=0.0)
-    state_dict = torch.load(ckpt_path, map_location="cpu", weights_only=True)
+    try:
+        state_dict = torch.load(ckpt_path, map_location="cpu", weights_only=True)
+    except Exception:
+        state_dict = torch.load(ckpt_path, map_location="cpu")
     net.load_state_dict(state_dict)
 
     # Free memory: delete optimizer state if present, strip gradients
@@ -242,7 +259,12 @@ async def track_activity(request: Request, call_next):
 @app.post("/api/admin/heartbeat")
 async def heartbeat(request: Request):
     """Register or keep alive a player session."""
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
     session_id = body.get("session_id") or str(uuid.uuid4())
     now = time.time()
     if session_id not in sessions:
@@ -260,7 +282,12 @@ async def heartbeat(request: Request):
 @app.post("/api/admin/game-over")
 async def game_over(request: Request):
     """Record that a session finished a game."""
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
     session_id = body.get("session_id")
     if session_id and session_id in sessions:
         sessions[session_id]["games_played"] += 1

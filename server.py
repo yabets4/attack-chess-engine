@@ -129,6 +129,24 @@ def get_legal_move_indices(board: chess.Board) -> list:
     return indices
 
 
+def resolve_checkpoints_dir() -> str:
+    """Resolve checkpoints directory searching current directory and parent directory."""
+    global checkpoints_dir
+    if checkpoints_dir and os.path.exists(checkpoints_dir):
+        return checkpoints_dir
+
+    curr = Path(__file__).resolve().parent
+    parent = curr.parent
+    if (curr / "model_best.pt").exists() or list(curr.glob("model_*.pt")):
+        checkpoints_dir = str(curr)
+    elif (parent / "model_best.pt").exists() or list(parent.glob("model_*.pt")):
+        checkpoints_dir = str(parent)
+    else:
+        checkpoints_dir = str(curr)
+
+    return checkpoints_dir
+
+
 def load_model(checkpoint_name: str = "latest"):
     """Load a model checkpoint (memory-optimised for small instances)."""
     global model, device
@@ -348,22 +366,18 @@ async def admin_stats():
 @app.on_event("startup")
 async def startup_event():
     """Print startup info — model loads lazily on first request."""
-    global checkpoints_dir
-    checkpoints_dir = str(Path(__file__).resolve().parent)
-    print(f"Checkpoints directory: {checkpoints_dir}")
+    dir_path = resolve_checkpoints_dir()
+    print(f"Checkpoints directory: {dir_path}")
     print("Model will load lazily on first request to save memory.")
 
 
 @app.get("/api/checkpoints")
 async def get_checkpoints():
     """List available checkpoints."""
-    global checkpoints_dir
-
-    if checkpoints_dir is None:
-        checkpoints_dir = str(Path(__file__).resolve().parent)
+    dir_path = resolve_checkpoints_dir()
 
     checkpoints = ["latest"]
-    for f in sorted(glob.glob(os.path.join(checkpoints_dir, "model_*.pt"))):
+    for f in sorted(glob.glob(os.path.join(dir_path, "model_*.pt"))):
         name = os.path.basename(f)
         if name not in checkpoints:
             checkpoints.append(name)
